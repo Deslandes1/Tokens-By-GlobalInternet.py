@@ -554,40 +554,36 @@ def get_ai_analysis(token_code=None):
     except Exception as e:
         return f"⚠️ AI error: {str(e)}"
 
-# ========== VOICE SCRIPT FOR THE OWNER ==========
-def get_owner_voice_script():
+# ========== VOICE SCRIPT – FOR CUSTOMERS (How to Buy) ==========
+def get_customer_voice_script():
     return f"""
-Welcome, Gesner Deslandes, to your Application Tokens business dashboard.
+Welcome! This is the Application Tokens purchasing guide from GlobalInternet.py.
 
-This is your token sales platform built by GlobalInternet.py.
+Here is how you can buy a token to unlock our software.
 
-Here is how this business works.
+First, go to the Buy Tokens tab. You will see five pricing plans.
 
-First, you generate unique token codes using the Admin panel. Each token represents access to your software products. You set the price and the validity period for each token.
+The Trial Pack costs 5 US dollars and gives you 5 tokens valid for 30 days.
+The Basic Monthly plan is 15 dollars for 20 tokens, valid for 30 days.
+The Pro Monthly plan is 29 dollars for 50 tokens, valid for 30 days.
+The Enterprise Monthly plan is 49 dollars for 100 tokens, valid for 30 days.
+And the Lifetime License is 199 dollars for unlimited tokens forever.
 
-Second, you sell these tokens to customers. They pay you via MonCash or Primse Transfer using the phone number {MONCASH_NUMBER}. Once they pay, you manually send them the token code.
+Choose the plan that fits your needs.
 
-Third, customers use the token by entering it in the Verify Token tab. The app checks if the token is valid, unused, and not expired. If everything is correct, the customer gets access to your software.
+Next, you need to make a payment. We accept MonCash and Primse Transfer. Send your payment to the phone number {MONCASH_NUMBER}. The account holder is {MONCASH_OWNER}. Make sure to keep your payment receipt.
 
-The token codes are secure, unique, and stored either in your local SQLite database or in Supabase if you have it connected. You can also use the Groq AI to analyze your token sales and get business recommendations.
+After you pay, contact us by email at {CONTACT_EMAIL} or by phone at {CONTACT_PHONE}. Send us your payment receipt and tell us which plan you purchased.
 
-You have five pricing plans. The Trial Pack at 5 dollars for 5 tokens. Basic Monthly at 15 dollars for 20 tokens. Pro Monthly at 29 dollars for 50 tokens. Enterprise Monthly at 49 dollars for 100 tokens. And Lifetime License at 199 dollars for unlimited tokens forever.
+We will then send you a unique token code by email within 24 hours. This token code is your access key.
 
-To run this app, you simply deploy it on Streamlit Cloud using the GitHub repository. All your secrets like admin password, contact info, and payment details are stored securely in Streamlit's secrets manager. No sensitive data is exposed in the code.
+Once you receive your token, go to the Verify Token tab. Enter your token code and click Verify. If the token is valid, unused, and not expired, you will see a success message.
 
-You, as the owner, have full control. You can generate tokens one by one or in bulk, export the entire token list as a CSV file, delete expired or unused tokens, and monitor your inventory in real time.
+Now you have full access to all GlobalInternet.py software products! You can use your token to unlock voting systems, dashboards, AI tools, chatbots, school management, drone control, music production, and many more.
 
-The tokens themselves are used by your customers to unlock any software product you offer – voting systems, dashboards, AI tools, chatbots, school management, drone control, music production, and more. Each token gives the customer a license to use that product.
+If you have any questions, contact us anytime. We are here to help.
 
-Your revenue comes directly from token sales. No third-party fees, no subscriptions to worry about – just you, your customers, and your software.
-
-Everything is encrypted, secure, and built to scale. As your business grows, you can add more tokens, more plans, and integrate with Supabase for cloud storage.
-
-This is your business, your software, and your future.
-
-Welcome to GlobalInternet.py – connecting the global market with local expertise.
-
-Thank you for choosing GlobalInternet.py. We are the best online software company ever.
+Thank you for choosing GlobalInternet.py – connecting the global market with local expertise.
 """
 
 # ---------- Init DB ----------
@@ -610,12 +606,6 @@ if 'last_price' not in st.session_state:
     st.session_state.last_price = ""
 if 'last_expiry' not in st.session_state:
     st.session_state.last_expiry = ""
-if 'custom_plan' not in st.session_state:
-    st.session_state.custom_plan = ""
-if 'custom_price' not in st.session_state:
-    st.session_state.custom_price = 0.0
-if 'custom_lifetime' not in st.session_state:
-    st.session_state.custom_lifetime = False
 
 # ========== HEADER ==========
 st.markdown("""
@@ -639,24 +629,25 @@ with st.sidebar:
     
     st.markdown("---")
     
-    st.markdown("### 🎤 AI Assistant")
-    st.markdown("Get a voice explanation about this token business.")
+    st.markdown("### 🎤 Customer Guide")
+    st.markdown("Hear how to buy a token step by step.")
     
-    voice_clicked = st.button("🎤 AI Female Voice – Explain Token Business", use_container_width=True)
+    # Customer voice button
+    voice_clicked = st.button("🎤 AI Female Voice – How to Buy a Token", use_container_width=True)
     
     if voice_clicked:
-        script = get_owner_voice_script()
-        with st.spinner("🎤 Generating voice explanation..."):
+        script = get_customer_voice_script()
+        with st.spinner("🎤 Generating voice guide..."):
             audio_bytes = generate_audio(script, "en")
             if audio_bytes:
                 st.audio(audio_bytes, format="audio/mp3")
-                st.success("✅ Voice explanation played. Click again to repeat.")
+                st.success("✅ Voice guide played. Click again to repeat.")
             else:
                 st.error("❌ Voice generation failed. Please ensure gTTS is installed.")
     
     st.markdown("---")
     
-    # Voice language selector for AI analysis reading
+    # Voice language selector for AI analysis reading (admin only)
     voice_lang = st.selectbox(
         "🎤 Voice Language for Analysis",
         options=["en", "fr", "es", "zh"],
@@ -706,7 +697,7 @@ with st.sidebar:
     st.markdown("All tokens are encrypted and stored securely.")
 
 # ========== TABS ==========
-tab_buy, tab_verify, tab_ai, tab_admin = st.tabs(["🛒 Buy Tokens", "🔓 Verify Token", "🤖 AI Analysis", "🔐 Admin"])
+tab_buy, tab_verify, tab_admin = st.tabs(["🛒 Buy Tokens", "🔓 Verify Token", "🔐 Admin"])
 
 # ---------- BUY TOKENS ----------
 with tab_buy:
@@ -826,46 +817,6 @@ with tab_verify:
             st.success("Token marked as used")
             st.rerun()
 
-# ---------- AI ANALYSIS ----------
-with tab_ai:
-    st.markdown("### 🤖 AI Token Analysis")
-    st.markdown("Get AI-powered insights about your token inventory using Groq.")
-    
-    if not GROQ_CONNECTED:
-        st.info("ℹ️ Groq AI is not configured. To enable, add your `GROQ_API_KEY` to secrets. The app will then show AI insights here.")
-    else:
-        col_ai1, col_ai2 = st.columns(2)
-        with col_ai1:
-            if st.button("📊 Analyze Token Stats", use_container_width=True):
-                with st.spinner("🤖 AI is analyzing..."):
-                    st.session_state.ai_response = get_ai_analysis()
-        with col_ai2:
-            token_code_for_ai = st.text_input("Or analyze a specific token:", placeholder="Enter token code", key="ai_token_input")
-            if st.button("🔍 Analyze Specific Token", use_container_width=True):
-                if token_code_for_ai:
-                    with st.spinner("🤖 AI is analyzing token..."):
-                        st.session_state.ai_response = get_ai_analysis(token_code_for_ai)
-                else:
-                    st.warning("Please enter a token code.")
-        
-        if st.session_state.ai_response:
-            st.markdown("### 💡 AI Insights")
-            st.markdown(f'<div class="groq-response">{st.session_state.ai_response}</div>', unsafe_allow_html=True)
-            
-            if st.button("🔊 Listen to Analysis", use_container_width=True):
-                with st.spinner("🎤 Generating audio..."):
-                    lang_code = voice_lang if 'voice_lang' in locals() else "en"
-                    if lang_code == "zh":
-                        lang_code = "zh-CN"
-                    audio_bytes = generate_audio(st.session_state.ai_response, lang_code)
-                    if audio_bytes:
-                        st.audio(audio_bytes, format="audio/mp3")
-                        st.success("✅ Analysis played. Click again to repeat.")
-                    else:
-                        st.error("❌ Voice generation failed. Please ensure gTTS is installed.")
-        else:
-            st.info("No analysis yet. Click one of the buttons above to generate insights.")
-
 # ---------- ADMIN ----------
 with tab_admin:
     st.markdown("### 🔐 Admin Panel")
@@ -884,7 +835,7 @@ with tab_admin:
         st.success("🔐 Admin access granted")
         
         # ============================================================
-        # NEW: CUSTOM TOKEN GENERATOR – GENERATE TOKENS WITH YOUR OWN PRICE & PLAN NAME
+        # CUSTOM TOKEN GENERATOR
         # ============================================================
         st.markdown("### 🛠️ Custom Token Generator")
         st.markdown("Create a token with your own plan name and price – complete flexibility.")
@@ -957,7 +908,7 @@ Keep this code secure and share it only with the buyer.
         
         st.markdown("---")
         
-        # ---------- GENERATE PREDEFINED TOKENS ----------
+        # ---------- PREDEFINED TOKENS ----------
         st.markdown("### 🆕 Generate Predefined Tokens")
         st.markdown("Quick‑generate tokens from the standard plans.")
         
@@ -1111,6 +1062,50 @@ Keep this code secure and share it only with the buyer.
         
         st.markdown("---")
         
+        # ============================================================
+        # AI ANALYST – ADMIN‑ONLY FEATURE
+        # ============================================================
+        st.markdown("### 🤖 AI Analyst")
+        st.markdown("Get AI‑powered insights about your token inventory using Groq.")
+        
+        if not GROQ_CONNECTED:
+            st.info("ℹ️ Groq AI is not configured. To enable, add your `GROQ_API_KEY` to secrets. The app will then show AI insights here.")
+        else:
+            col_ai1, col_ai2 = st.columns(2)
+            with col_ai1:
+                if st.button("📊 Analyze Token Stats", use_container_width=True, key="admin_ai_stats"):
+                    with st.spinner("🤖 AI is analyzing..."):
+                        st.session_state.ai_response = get_ai_analysis()
+            with col_ai2:
+                token_code_for_ai = st.text_input("Or analyze a specific token:", placeholder="Enter token code", key="admin_ai_token")
+                if st.button("🔍 Analyze Specific Token", use_container_width=True, key="admin_ai_specific"):
+                    if token_code_for_ai:
+                        with st.spinner("🤖 AI is analyzing token..."):
+                            st.session_state.ai_response = get_ai_analysis(token_code_for_ai)
+                    else:
+                        st.warning("Please enter a token code.")
+            
+            if st.session_state.ai_response:
+                st.markdown("### 💡 AI Insights")
+                st.markdown(f'<div class="groq-response">{st.session_state.ai_response}</div>', unsafe_allow_html=True)
+                
+                if st.button("🔊 Listen to Analysis", use_container_width=True, key="admin_ai_listen"):
+                    with st.spinner("🎤 Generating audio..."):
+                        lang_code = voice_lang if 'voice_lang' in locals() else "en"
+                        if lang_code == "zh":
+                            lang_code = "zh-CN"
+                        audio_bytes = generate_audio(st.session_state.ai_response, lang_code)
+                        if audio_bytes:
+                            st.audio(audio_bytes, format="audio/mp3")
+                            st.success("✅ Analysis played. Click again to repeat.")
+                        else:
+                            st.error("❌ Voice generation failed. Please ensure gTTS is installed.")
+            else:
+                st.info("No analysis yet. Click one of the buttons above to generate insights.")
+        
+        st.markdown("---")
+        
+        # ---------- LOGOUT ----------
         if st.button("🚪 Logout Admin", use_container_width=True):
             st.session_state.admin_authenticated = False
             st.rerun()
