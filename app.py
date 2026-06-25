@@ -1,3 +1,7 @@
+# ============================================================================
+# Full app.py – includes download buttons for each generated token
+# ============================================================================
+
 import streamlit as st
 import sqlite3
 import uuid
@@ -29,7 +33,6 @@ except ImportError:
     VOICE_AVAILABLE = False
 
 def generate_audio(text, lang_code="en"):
-    """Generate audio from text using gTTS"""
     if not VOICE_AVAILABLE or not text.strip():
         return None
     try:
@@ -236,7 +239,6 @@ st.markdown("""
         transform: scale(1.03);
         box-shadow: 0 0 30px rgba(255, 45, 85, 0.4) !important;
     }
-    /* Styling for token list rows */
     .token-row {
         display: flex;
         align-items: center;
@@ -589,6 +591,14 @@ if 'verified_token' not in st.session_state:
     st.session_state.verified_token = None
 if 'ai_response' not in st.session_state:
     st.session_state.ai_response = ""
+if 'last_generated' not in st.session_state:
+    st.session_state.last_generated = None
+if 'last_plan' not in st.session_state:
+    st.session_state.last_plan = ""
+if 'last_price' not in st.session_state:
+    st.session_state.last_price = ""
+if 'last_expiry' not in st.session_state:
+    st.session_state.last_expiry = ""
 
 # ========== HEADER ==========
 st.markdown("""
@@ -830,30 +840,78 @@ with tab_admin:
     else:
         st.success("🔐 Admin access granted")
         
+        # ---------- GENERATE NEW TOKENS (with download) ----------
         st.markdown("### 🆕 Generate New Tokens")
         col_gen1, col_gen2, col_gen3 = st.columns(3)
         with col_gen1:
             if st.button("📦 Trial ($5)", use_container_width=True):
                 token, _ = generate_token("Trial Pack", 5.0, False)
-                st.success(f"Token: `{token}`")
+                st.session_state.last_generated = token
+                st.session_state.last_plan = "Trial Pack"
+                st.session_state.last_price = "$5.00"
+                st.session_state.last_expiry = (datetime.now() + timedelta(days=30)).strftime("%Y-%m-%d")
+                st.rerun()
         with col_gen2:
             if st.button("🚀 Basic ($15)", use_container_width=True):
                 token, _ = generate_token("Basic Monthly", 15.0, False)
-                st.success(f"Token: `{token}`")
+                st.session_state.last_generated = token
+                st.session_state.last_plan = "Basic Monthly"
+                st.session_state.last_price = "$15.00"
+                st.session_state.last_expiry = (datetime.now() + timedelta(days=30)).strftime("%Y-%m-%d")
+                st.rerun()
         with col_gen3:
             if st.button("💼 Pro ($29)", use_container_width=True):
                 token, _ = generate_token("Pro Monthly", 29.0, False)
-                st.success(f"Token: `{token}`")
+                st.session_state.last_generated = token
+                st.session_state.last_plan = "Pro Monthly"
+                st.session_state.last_price = "$29.00"
+                st.session_state.last_expiry = (datetime.now() + timedelta(days=30)).strftime("%Y-%m-%d")
+                st.rerun()
         
         col_gen4, col_gen5 = st.columns(2)
         with col_gen4:
             if st.button("🏢 Enterprise ($49)", use_container_width=True):
                 token, _ = generate_token("Enterprise Monthly", 49.0, False)
-                st.success(f"Token: `{token}`")
+                st.session_state.last_generated = token
+                st.session_state.last_plan = "Enterprise Monthly"
+                st.session_state.last_price = "$49.00"
+                st.session_state.last_expiry = (datetime.now() + timedelta(days=30)).strftime("%Y-%m-%d")
+                st.rerun()
         with col_gen5:
             if st.button("⭐ Lifetime ($199)", use_container_width=True):
                 token, _ = generate_token("Lifetime License", 199.0, True)
-                st.success(f"Token: `{token}` (♾️ Never expires)")
+                st.session_state.last_generated = token
+                st.session_state.last_plan = "Lifetime License"
+                st.session_state.last_price = "$199.00"
+                st.session_state.last_expiry = "Never"
+                st.rerun()
+        
+        # Display last generated token with download button
+        if st.session_state.last_generated:
+            st.markdown("---")
+            st.markdown("### 🎯 Last Generated Token")
+            col_display, col_download = st.columns([3, 1])
+            with col_display:
+                st.code(st.session_state.last_generated, language="text")
+                st.caption(f"Plan: {st.session_state.last_plan} | Price: {st.session_state.last_price} | Expiry: {st.session_state.last_expiry}")
+            with col_download:
+                token_content = f"""
+Token Code: {st.session_state.last_generated}
+Plan: {st.session_state.last_plan}
+Price: {st.session_state.last_price}
+Expiry: {st.session_state.last_expiry}
+Purchase Date: {datetime.now().strftime('%Y-%m-%d %H:%M')}
+---
+This token grants access to GlobalInternet.py software.
+Keep this code secure and share it only with the buyer.
+"""
+                st.download_button(
+                    label="📥 Download Token",
+                    data=token_content,
+                    file_name=f"token_{st.session_state.last_generated[:8]}.txt",
+                    mime="text/plain",
+                    use_container_width=True
+                )
         
         st.markdown("---")
         
@@ -875,9 +933,7 @@ with tab_admin:
         
         st.markdown("---")
         
-        # ============================================================
-        # UPDATED ALL TOKENS LIST – WITH COPY & DELETE BUTTONS
-        # ============================================================
+        # ---------- ALL TOKENS LIST (with copy & delete) ----------
         st.markdown("### 📋 All Tokens")
         tokens = get_all_tokens()
         
@@ -885,19 +941,15 @@ with tab_admin:
             for idx, token_data in enumerate(tokens):
                 token_code, plan, price, purchase_date, expiry, lifetime, used, status = token_data
                 
-                # Build a row using columns
                 col_code, col_plan, col_status, col_expiry, col_copy, col_delete = st.columns([2.5, 1.5, 1, 1, 0.6, 0.6])
                 
-                # Token code (monospace, copyable via button)
                 with col_code:
                     st.code(token_code, language="text")
                 
-                # Plan and price
                 with col_plan:
                     st.write(f"{plan}")
                     st.caption(f"${price:.2f} USD")
                 
-                # Status
                 with col_status:
                     status_emoji = {
                         'active': '🟢',
@@ -906,21 +958,18 @@ with tab_admin:
                     }.get(status, '⚪')
                     st.write(f"{status_emoji} {status.title()}")
                 
-                # Expiry
                 with col_expiry:
                     if expiry:
                         st.write(expiry[:10])
                     else:
                         st.write("Never")
                 
-                # Copy button
                 with col_copy:
                     copy_html = f"""
                     <button onclick="navigator.clipboard.writeText('{token_code}').then(() => alert('Token copied to clipboard!'))" style="background:transparent; border:none; cursor:pointer; font-size:1.4rem; color:#00ff64;">📋</button>
                     """
                     st.markdown(copy_html, unsafe_allow_html=True)
                 
-                # Delete button
                 with col_delete:
                     if st.button("🗑️", key=f"del_{idx}"):
                         ok, msg = delete_token(token_code, ADMIN_PASSWORD)
@@ -930,14 +979,13 @@ with tab_admin:
                         else:
                             st.error(f"❌ {msg}")
                 
-                # Divider
                 st.markdown("---")
         else:
             st.info("No tokens yet. Generate some!")
         
         st.markdown("---")
         
-        # Export CSV (still here)
+        # ---------- EXPORT CSV ----------
         if tokens:
             df = pd.DataFrame(tokens, columns=['Token Code', 'Plan', 'Price (USD)', 'Purchase Date', 'Expiry', 'Lifetime', 'Used', 'Status'])
             df['Lifetime'] = df['Lifetime'].apply(lambda x: '✅' if x == 1 else '')
@@ -945,7 +993,7 @@ with tab_admin:
             df['Status'] = df['Status'].apply(lambda x: {'active': '🟢 Active', 'used': '🔵 Used', 'expired': '🔴 Expired'}.get(x, x))
             csv = df.to_csv(index=False)
             st.download_button(
-                "📥 Export CSV",
+                "📥 Export CSV (All Tokens)",
                 csv,
                 f"tokens_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
                 "text/csv",
@@ -953,7 +1001,7 @@ with tab_admin:
             )
             st.markdown("---")
         
-        # Fallback delete by manual input
+        # ---------- DELETE BY MANUAL INPUT ----------
         st.markdown("### 🗑️ Delete Token by Code (Manual)")
         del_code = st.text_input("Enter token code to delete:", key="del_token")
         if st.button("Delete Token", use_container_width=True):
