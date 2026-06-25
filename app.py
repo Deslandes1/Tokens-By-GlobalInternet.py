@@ -1,7 +1,3 @@
-# ============================================================================
-# Full app.py – includes download buttons for each generated token
-# ============================================================================
-
 import streamlit as st
 import sqlite3
 import uuid
@@ -33,6 +29,7 @@ except ImportError:
     VOICE_AVAILABLE = False
 
 def generate_audio(text, lang_code="en"):
+    """Generate audio from text using gTTS"""
     if not VOICE_AVAILABLE or not text.strip():
         return None
     try:
@@ -639,6 +636,16 @@ with st.sidebar:
     
     st.markdown("---")
     
+    # Voice language selector for AI analysis reading
+    voice_lang = st.selectbox(
+        "🎤 Voice Language for Analysis",
+        options=["en", "fr", "es", "zh"],
+        format_func=lambda x: {"en": "English", "fr": "Français", "es": "Español", "zh": "中文"}.get(x, x),
+        key="voice_lang_analysis"
+    )
+    
+    st.markdown("---")
+    
     st.markdown("### 💳 Payment Methods")
     st.markdown(f"""
     - **MonCash / Primse Transfer:** {MONCASH_NUMBER}
@@ -807,21 +814,42 @@ with tab_ai:
     if not GROQ_CONNECTED:
         st.info("ℹ️ Groq AI is not configured. To enable, add your `GROQ_API_KEY` to secrets. The app will then show AI insights here.")
     else:
-        if st.button("📊 Analyze Token Stats", use_container_width=True):
-            with st.spinner("🤖 AI is analyzing..."):
-                st.session_state.ai_response = get_ai_analysis()
+        # Buttons for analysis
+        col_ai1, col_ai2 = st.columns(2)
+        with col_ai1:
+            if st.button("📊 Analyze Token Stats", use_container_width=True):
+                with st.spinner("🤖 AI is analyzing..."):
+                    st.session_state.ai_response = get_ai_analysis()
+        with col_ai2:
+            token_code_for_ai = st.text_input("Or analyze a specific token:", placeholder="Enter token code", key="ai_token_input")
+            if st.button("🔍 Analyze Specific Token", use_container_width=True):
+                if token_code_for_ai:
+                    with st.spinner("🤖 AI is analyzing token..."):
+                        st.session_state.ai_response = get_ai_analysis(token_code_for_ai)
+                else:
+                    st.warning("Please enter a token code.")
         
-        token_code_for_ai = st.text_input("Or analyze a specific token:", placeholder="Enter token code", key="ai_token_input")
-        if st.button("🔍 Analyze Specific Token", use_container_width=True):
-            if token_code_for_ai:
-                with st.spinner("🤖 AI is analyzing token..."):
-                    st.session_state.ai_response = get_ai_analysis(token_code_for_ai)
-            else:
-                st.warning("Please enter a token code.")
-        
+        # Display AI response
         if st.session_state.ai_response:
             st.markdown("### 💡 AI Insights")
             st.markdown(f'<div class="groq-response">{st.session_state.ai_response}</div>', unsafe_allow_html=True)
+            
+            # ----- NEW: Listen to Analysis Button -----
+            if st.button("🔊 Listen to Analysis", use_container_width=True):
+                with st.spinner("🎤 Generating audio..."):
+                    # Get the current voice language from sidebar
+                    lang_code = voice_lang if 'voice_lang' in locals() else "en"
+                    # Map language codes to gTTS supported codes: 'zh' for Chinese
+                    if lang_code == "zh":
+                        lang_code = "zh-CN"  # gTTS supports 'zh' as well, but let's keep it
+                    audio_bytes = generate_audio(st.session_state.ai_response, lang_code)
+                    if audio_bytes:
+                        st.audio(audio_bytes, format="audio/mp3")
+                        st.success("✅ Analysis played. Click again to repeat.")
+                    else:
+                        st.error("❌ Voice generation failed. Please ensure gTTS is installed.")
+        else:
+            st.info("No analysis yet. Click one of the buttons above to generate insights.")
 
 # ---------- ADMIN ----------
 with tab_admin:
