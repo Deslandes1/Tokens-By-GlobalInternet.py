@@ -236,6 +236,42 @@ st.markdown("""
         transform: scale(1.03);
         box-shadow: 0 0 30px rgba(255, 45, 85, 0.4) !important;
     }
+    /* Styling for token list rows */
+    .token-row {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        padding: 8px 0;
+        border-bottom: 1px solid #2a1f14;
+        flex-wrap: wrap;
+    }
+    .token-code {
+        font-family: monospace;
+        background: #141018;
+        padding: 4px 8px;
+        border-radius: 4px;
+        color: #00ff64;
+        font-size: 0.9rem;
+        flex: 1;
+        min-width: 150px;
+    }
+    .token-info {
+        color: #a09080;
+        font-size: 0.85rem;
+    }
+    .action-btn {
+        background: transparent;
+        border: none;
+        cursor: pointer;
+        font-size: 1.2rem;
+        padding: 0 5px;
+        color: #ffffff;
+        transition: 0.2s;
+    }
+    .action-btn:hover {
+        color: #00ff64;
+        transform: scale(1.1);
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -839,15 +875,74 @@ with tab_admin:
         
         st.markdown("---")
         
+        # ============================================================
+        # UPDATED ALL TOKENS LIST – WITH COPY & DELETE BUTTONS
+        # ============================================================
         st.markdown("### 📋 All Tokens")
         tokens = get_all_tokens()
+        
+        if tokens:
+            for idx, token_data in enumerate(tokens):
+                token_code, plan, price, purchase_date, expiry, lifetime, used, status = token_data
+                
+                # Build a row using columns
+                col_code, col_plan, col_status, col_expiry, col_copy, col_delete = st.columns([2.5, 1.5, 1, 1, 0.6, 0.6])
+                
+                # Token code (monospace, copyable via button)
+                with col_code:
+                    st.code(token_code, language="text")
+                
+                # Plan and price
+                with col_plan:
+                    st.write(f"{plan}")
+                    st.caption(f"${price:.2f} USD")
+                
+                # Status
+                with col_status:
+                    status_emoji = {
+                        'active': '🟢',
+                        'used': '🔵',
+                        'expired': '🔴'
+                    }.get(status, '⚪')
+                    st.write(f"{status_emoji} {status.title()}")
+                
+                # Expiry
+                with col_expiry:
+                    if expiry:
+                        st.write(expiry[:10])
+                    else:
+                        st.write("Never")
+                
+                # Copy button
+                with col_copy:
+                    copy_html = f"""
+                    <button onclick="navigator.clipboard.writeText('{token_code}').then(() => alert('Token copied to clipboard!'))" style="background:transparent; border:none; cursor:pointer; font-size:1.4rem; color:#00ff64;">📋</button>
+                    """
+                    st.markdown(copy_html, unsafe_allow_html=True)
+                
+                # Delete button
+                with col_delete:
+                    if st.button("🗑️", key=f"del_{idx}"):
+                        ok, msg = delete_token(token_code, ADMIN_PASSWORD)
+                        if ok:
+                            st.toast(f"✅ Token {token_code} deleted", icon="🗑️")
+                            st.rerun()
+                        else:
+                            st.error(f"❌ {msg}")
+                
+                # Divider
+                st.markdown("---")
+        else:
+            st.info("No tokens yet. Generate some!")
+        
+        st.markdown("---")
+        
+        # Export CSV (still here)
         if tokens:
             df = pd.DataFrame(tokens, columns=['Token Code', 'Plan', 'Price (USD)', 'Purchase Date', 'Expiry', 'Lifetime', 'Used', 'Status'])
             df['Lifetime'] = df['Lifetime'].apply(lambda x: '✅' if x == 1 else '')
             df['Used'] = df['Used'].apply(lambda x: '✅' if x == 1 else '')
             df['Status'] = df['Status'].apply(lambda x: {'active': '🟢 Active', 'used': '🔵 Used', 'expired': '🔴 Expired'}.get(x, x))
-            st.dataframe(df, use_container_width=True, height=400)
-            
             csv = df.to_csv(index=False)
             st.download_button(
                 "📥 Export CSV",
@@ -856,23 +951,17 @@ with tab_admin:
                 "text/csv",
                 use_container_width=True
             )
-        else:
-            st.info("No tokens yet. Generate some!")
+            st.markdown("---")
         
-        st.markdown("---")
-        
-        # ============================================================
-        # UPDATED DELETE TOKEN SECTION (with .strip() and toast)
-        # ============================================================
-        st.markdown("### 🗑️ Delete Token")
+        # Fallback delete by manual input
+        st.markdown("### 🗑️ Delete Token by Code (Manual)")
         del_code = st.text_input("Enter token code to delete:", key="del_token")
         if st.button("Delete Token", use_container_width=True):
-            # Trim whitespace from the entered code
             del_code_clean = del_code.strip() if del_code else ""
             if del_code_clean:
                 ok, msg = delete_token(del_code_clean, ADMIN_PASSWORD)
                 if ok:
-                    st.toast(f"✅ Token {del_code_clean} was removed from the list", icon="🗑️")
+                    st.toast(f"✅ Token {del_code_clean} was removed", icon="🗑️")
                     st.rerun()
                 else:
                     st.error(f"❌ {msg}")
