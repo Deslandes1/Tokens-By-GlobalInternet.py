@@ -80,7 +80,6 @@ T = {
         "sidebar_customer_guide": "Customer Guide",
         "sidebar_how_to_buy": "How to buy a token step by step.",
         "voice_how_to_buy": "🎤 AI Female Voice – How to Buy a Token",
-        "sidebar_voice_lang": "Voice Language for Analysis",
         "sidebar_payment": "Payment Methods",
         "sidebar_payment_moncash": "MonCash / Primse Transfer",
         "sidebar_payment_holder": "Account Holder",
@@ -216,7 +215,6 @@ T = {
         "footer_copyright": "© 2026 GlobalInternet.py Online Software Company",
         "footer_built": "Built by <strong>Gesner Deslandes</strong>",
         "footer_secure": "🔐 All tokens encrypted and stored securely. Payment via MonCash / Primse Transfer accepted worldwide.",
-        # Voice scripts
         "voice_customer_script": """
 Welcome! This is the Application Tokens purchasing guide from GlobalInternet.py.
 
@@ -258,7 +256,6 @@ Thank you for choosing GlobalInternet.py – connecting the global market with l
         "sidebar_customer_guide": "Guide Client",
         "sidebar_how_to_buy": "Comment acheter un jeton étape par étape.",
         "voice_how_to_buy": "🎤 Voix IA Féminine – Comment acheter un jeton",
-        "sidebar_voice_lang": "Langue vocale pour l'analyse",
         "sidebar_payment": "Moyens de paiement",
         "sidebar_payment_moncash": "MonCash / Prisme Transfer",
         "sidebar_payment_holder": "Titulaire du compte",
@@ -435,7 +432,6 @@ Merci d'avoir choisi GlobalInternet.py – connecter le marché mondial à l'exp
         "sidebar_customer_guide": "Guía para el cliente",
         "sidebar_how_to_buy": "Cómo comprar un token paso a paso.",
         "voice_how_to_buy": "🎤 Voz IA Femenina – Cómo comprar un token",
-        "sidebar_voice_lang": "Idioma de voz para análisis",
         "sidebar_payment": "Métodos de pago",
         "sidebar_payment_moncash": "MonCash / Prisme Transfer",
         "sidebar_payment_holder": "Titular de la cuenta",
@@ -612,7 +608,6 @@ Gracias por elegir GlobalInternet.py – conectando el mercado global con experi
         "sidebar_customer_guide": "客户指南",
         "sidebar_how_to_buy": "如何一步一步购买令牌。",
         "voice_how_to_buy": "🎤 人工智能女声 – 如何购买令牌",
-        "sidebar_voice_lang": "分析用的语音语言",
         "sidebar_payment": "支付方式",
         "sidebar_payment_moncash": "MonCash / Prisme Transfer",
         "sidebar_payment_holder": "账户持有人",
@@ -1351,39 +1346,26 @@ with st.sidebar:
     st.markdown(f"### 🎤 {t('sidebar_customer_guide')}")
     st.markdown(f"<p style='font-size:0.85rem; color:#a09080;'>{t('sidebar_how_to_buy')}</p>", unsafe_allow_html=True)
     
-    # Customer voice button
+    # Customer voice button – uses st.session_state.lang
     voice_clicked = st.button(t('voice_how_to_buy'), use_container_width=True)
     
     if voice_clicked:
-        # Get the script for the current language and format it with contact details
-        script_template = T[st.session_state.lang]['voice_customer_script']
-        script = script_template.format(
+        script = T[st.session_state.lang]['voice_customer_script'].format(
             moncash=MONCASH_NUMBER,
             owner=MONCASH_OWNER,
             email=CONTACT_EMAIL,
             phone=CONTACT_PHONE
         )
         with st.spinner("🎤 Generating voice guide..."):
-            # Map language to gTTS code
             lang_code = st.session_state.lang
             if lang_code == "zh":
-                lang_code = "zh"  # gTTS supports 'zh'
+                lang_code = "zh"
             audio_bytes = generate_audio(script, lang_code)
             if audio_bytes:
                 st.audio(audio_bytes, format="audio/mp3")
                 st.success("✅ Voice guide played. Click again to repeat.")
             else:
                 st.error("❌ Voice generation failed. Please ensure gTTS is installed.")
-    
-    st.markdown("---")
-    
-    # Voice language selector for AI analysis reading (admin only)
-    voice_lang = st.selectbox(
-        t('sidebar_voice_lang'),
-        options=["en", "fr", "es", "zh"],
-        format_func=lambda x: {"en": "English", "fr": "Français", "es": "Español", "zh": "中文"}[x],
-        key="voice_lang_analysis"
-    )
     
     st.markdown("---")
     
@@ -1828,10 +1810,10 @@ Keep this code secure and share it only with the buyer.
                 st.markdown(f"### 💡 {t('admin_ai_insights')}")
                 st.markdown(f'<div class="groq-response">{st.session_state.ai_response}</div>', unsafe_allow_html=True)
                 
-                # Listen button – uses the voice_lang selected in sidebar
+                # Listen button – uses the main language (st.session_state.lang)
                 if st.button(t('admin_ai_listen'), use_container_width=True, key="admin_ai_listen"):
                     with st.spinner("🎤 Generating audio..."):
-                        lang_code = voice_lang if 'voice_lang' in locals() else "en"
+                        lang_code = st.session_state.lang
                         if lang_code == "zh":
                             lang_code = "zh"
                         audio_bytes = generate_audio(st.session_state.ai_response, lang_code)
