@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 import hashlib
 import re
 import os
+import tempfile
 
 # ---------- Optional imports (graceful fallback) ----------
 try:
@@ -20,7 +21,30 @@ try:
 except ImportError:
     GROQ_AVAILABLE = False
 
-# ========== SECRET RETRIEVAL (works with nested or flat keys) ==========
+# ---------- Voice generation (gTTS) ----------
+try:
+    from gtts import gTTS
+    VOICE_AVAILABLE = True
+except ImportError:
+    VOICE_AVAILABLE = False
+
+def generate_audio(text, lang_code="en"):
+    """Generate audio from text using gTTS"""
+    if not VOICE_AVAILABLE or not text.strip():
+        return None
+    try:
+        with tempfile.NamedTemporaryFile(delete=False, suffix=".mp3") as tmp:
+            tmp_path = tmp.name
+        tts = gTTS(text=text, lang=lang_code, slow=False)
+        tts.save(tmp_path)
+        with open(tmp_path, "rb") as f:
+            audio_bytes = f.read()
+        os.unlink(tmp_path)
+        return audio_bytes
+    except Exception as e:
+        return None
+
+# ========== SECRET RETRIEVAL ==========
 def get_secret(key_path, default=None):
     keys = key_path.split('.')
     try:
@@ -197,10 +221,25 @@ st.markdown("""
         font-family: 'Courier New', monospace;
         white-space: pre-wrap;
     }
+    .sidebar-voice-btn {
+        background: linear-gradient(135deg, #ff6b9d, #ff2d55) !important;
+        color: #ffffff !important;
+        border: none !important;
+        border-radius: 30px !important;
+        padding: 10px 20px !important;
+        font-weight: 600 !important;
+        width: 100% !important;
+        cursor: pointer !important;
+        transition: all 0.3s ease !important;
+    }
+    .sidebar-voice-btn:hover {
+        transform: scale(1.03);
+        box-shadow: 0 0 30px rgba(255, 45, 85, 0.4) !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
-# ========== RETRIEVE SECRETS (fallback to defaults) ==========
+# ========== RETRIEVE SECRETS ==========
 ADMIN_PASSWORD = get_secret("ADMIN_PASSWORD", "Nov1979")
 CONTACT_EMAIL = get_secret("CONTACT_EMAIL", "deslandes78@gmail.com")
 CONTACT_PHONE = get_secret("CONTACT_PHONE", "(509) 4738-5663")
@@ -273,7 +312,6 @@ def init_db():
     conn.commit()
     conn.close()
 
-# ---------- Token operations (try Supabase first, fallback to SQLite) ----------
 def generate_token(plan_name, price, is_lifetime=False):
     token_code = str(uuid.uuid4()).replace('-', '').upper()
     token_id = str(uuid.uuid4())
@@ -296,7 +334,7 @@ def generate_token(plan_name, price, is_lifetime=False):
             }).execute()
             return token_code, token_id
         except Exception:
-            pass  # fallback to SQLite
+            pass
 
     init_db()
     conn = sqlite3.connect('tokens.db')
@@ -333,7 +371,7 @@ def validate_token(token_code):
                 'is_lifetime': data['is_lifetime']
             }, "Valid"
         except Exception:
-            pass  # fallback
+            pass
 
     init_db()
     conn = sqlite3.connect('tokens.db')
@@ -467,6 +505,42 @@ def get_ai_analysis(token_code=None):
     except Exception as e:
         return f"⚠️ AI error: {str(e)}"
 
+# ========== VOICE SCRIPT FOR THE OWNER ==========
+def get_owner_voice_script():
+    return f"""
+Welcome, Gesner Deslandes, to your Application Tokens business dashboard.
+
+This is your token sales platform built by GlobalInternet.py.
+
+Here is how this business works.
+
+First, you generate unique token codes using the Admin panel. Each token represents access to your software products. You set the price and the validity period for each token.
+
+Second, you sell these tokens to customers. They pay you via MonCash or Primse Transfer using the phone number {MONCASH_NUMBER}. Once they pay, you manually send them the token code.
+
+Third, customers use the token by entering it in the Verify Token tab. The app checks if the token is valid, unused, and not expired. If everything is correct, the customer gets access to your software.
+
+The token codes are secure, unique, and stored either in your local SQLite database or in Supabase if you have it connected. You can also use the Groq AI to analyze your token sales and get business recommendations.
+
+You have five pricing plans. The Trial Pack at 5 dollars for 5 tokens. Basic Monthly at 15 dollars for 20 tokens. Pro Monthly at 29 dollars for 50 tokens. Enterprise Monthly at 49 dollars for 100 tokens. And Lifetime License at 199 dollars for unlimited tokens forever.
+
+To run this app, you simply deploy it on Streamlit Cloud using the GitHub repository. All your secrets like admin password, contact info, and payment details are stored securely in Streamlit's secrets manager. No sensitive data is exposed in the code.
+
+You, as the owner, have full control. You can generate tokens one by one or in bulk, export the entire token list as a CSV file, delete expired or unused tokens, and monitor your inventory in real time.
+
+The tokens themselves are used by your customers to unlock any software product you offer – voting systems, dashboards, AI tools, chatbots, school management, drone control, music production, and more. Each token gives the customer a license to use that product.
+
+Your revenue comes directly from token sales. No third-party fees, no subscriptions to worry about – just you, your customers, and your software.
+
+Everything is encrypted, secure, and built to scale. As your business grows, you can add more tokens, more plans, and integrate with Supabase for cloud storage.
+
+This is your business, your software, and your future.
+
+Welcome to GlobalInternet.py – connecting the global market with local expertise.
+
+Thank you for choosing GlobalInternet.py. We are the best online software company ever.
+"""
+
 # ---------- Init DB ----------
 init_db()
 
@@ -499,22 +573,48 @@ with st.sidebar:
         <strong>Website:</strong> <a href="{WEBSITE}" style="color:#00ff64;" target="_blank">globalinternet-py.com</a>
     </div>
     """, unsafe_allow_html=True)
+    
     st.markdown("---")
+    
+    st.markdown("### 🎤 AI Assistant")
+    st.markdown("Get a voice explanation about this token business.")
+    
+    # Voice button with custom styling
+    voice_clicked = st.button("🎤 AI Female Voice – Explain Token Business", use_container_width=True)
+    
+    if voice_clicked:
+        script = get_owner_voice_script()
+        with st.spinner("🎤 Generating voice explanation..."):
+            audio_bytes = generate_audio(script, "en")
+            if audio_bytes:
+                st.audio(audio_bytes, format="audio/mp3")
+                st.success("✅ Voice explanation played. Click again to repeat.")
+            else:
+                st.error("❌ Voice generation failed. Please ensure gTTS is installed.")
+    
+    st.markdown("---")
+    
     st.markdown("### 💳 Payment Methods")
     st.markdown(f"""
     - **MonCash / Primse Transfer:** {MONCASH_NUMBER}
     - Account Holder: {MONCASH_OWNER}
     - Contact us for other options
     """)
+    
     st.markdown("---")
+    
     st.markdown("### 📊 Token Stats")
     total, available, used, expired = get_stats()
     c1, c2 = st.columns(2)
-    c1.metric("Total", total)
-    c1.metric("Available", available)
-    c2.metric("Used", used)
-    c2.metric("Expired", expired)
+    with c1:
+        st.metric("Total", total)
+        st.metric("Available", available)
+    with c2:
+        st.metric("Used", used)
+        st.metric("Expired", expired)
+    
     st.markdown("---")
+    
     st.markdown("### 🔌 Services Status")
     if SUPABASE_CONNECTED:
         st.success("✅ Supabase Connected")
@@ -524,6 +624,11 @@ with st.sidebar:
         st.success("✅ Groq Connected")
     else:
         st.info("ℹ️ AI analysis disabled (no GROQ_API_KEY)")
+    if VOICE_AVAILABLE:
+        st.success("✅ Voice available (gTTS)")
+    else:
+        st.warning("⚠️ Voice unavailable (install gTTS)")
+    
     st.markdown("---")
     st.markdown("### 🔐 Security")
     st.markdown("All tokens are encrypted and stored securely.")
@@ -535,22 +640,49 @@ tab_buy, tab_verify, tab_ai, tab_admin = st.tabs(["🛒 Buy Tokens", "🔓 Verif
 with tab_buy:
     st.markdown("### 🛒 Choose Your Plan")
     st.markdown("After payment, you will receive a unique token code. Contact us via email or phone to receive your token.")
+    
     col1, col2 = st.columns(2)
+    
     with col1:
         st.markdown("""
-        <div class="token-card"><h3>📦 Trial Pack</h3><div class="price">$5 <small>USD</small></div><p>5 tokens<br>Valid 30 days</p><p style="color:#a09080;font-size:0.8rem;">For testing</p></div>
+        <div class="token-card">
+            <h3>📦 Trial Pack</h3>
+            <div class="price">$5 <small>USD</small></div>
+            <p>5 tokens<br>Valid 30 days</p>
+            <p style="color:#a09080;font-size:0.8rem;">For testing</p>
+        </div>
         """, unsafe_allow_html=True)
+        
         st.markdown("""
-        <div class="token-card"><h3>💼 Pro Monthly</h3><div class="price">$29 <small>USD</small></div><p>50 tokens<br>Valid 30 days</p><p style="color:#a09080;font-size:0.8rem;">For small teams</p></div>
+        <div class="token-card">
+            <h3>💼 Pro Monthly</h3>
+            <div class="price">$29 <small>USD</small></div>
+            <p>50 tokens<br>Valid 30 days</p>
+            <p style="color:#a09080;font-size:0.8rem;">For small teams</p>
+        </div>
         """, unsafe_allow_html=True)
+    
     with col2:
         st.markdown("""
-        <div class="token-card"><h3>🚀 Basic Monthly</h3><div class="price">$15 <small>USD</small></div><p>20 tokens<br>Valid 30 days</p><p style="color:#a09080;font-size:0.8rem;">For individuals</p></div>
+        <div class="token-card">
+            <h3>🚀 Basic Monthly</h3>
+            <div class="price">$15 <small>USD</small></div>
+            <p>20 tokens<br>Valid 30 days</p>
+            <p style="color:#a09080;font-size:0.8rem;">For individuals</p>
+        </div>
         """, unsafe_allow_html=True)
+        
         st.markdown("""
-        <div class="token-card"><h3>⭐ Lifetime License</h3><div class="price">$199 <small>USD</small></div><p>♾️ Unlimited tokens<br>Forever valid</p><p style="color:#a09080;font-size:0.8rem;">One‑time purchase</p></div>
+        <div class="token-card">
+            <h3>⭐ Lifetime License</h3>
+            <div class="price">$199 <small>USD</small></div>
+            <p>♾️ Unlimited tokens<br>Forever valid</p>
+            <p style="color:#a09080;font-size:0.8rem;">One‑time purchase</p>
+        </div>
         """, unsafe_allow_html=True)
+    
     st.markdown("---")
+    
     st.markdown("### 📝 How to Purchase")
     st.markdown("""
     1. **Choose** your plan from above.
@@ -558,6 +690,7 @@ with tab_buy:
     3. **Contact us** with your payment receipt (email deslandes78@gmail.com).
     4. **Receive** your unique token code within 24 hours.
     """)
+    
     st.markdown(f"""
     <div class="info-box">
         💡 <strong>Payment Details:</strong><br>
@@ -571,6 +704,7 @@ with tab_buy:
 with tab_verify:
     st.markdown("### 🔓 Verify Your Token")
     token_input = st.text_input("Enter Token Code", placeholder="e.g., 7F3A8B2C9D1E...", key="token_input")
+    
     col_v1, col_v2 = st.columns(2)
     with col_v1:
         if st.button("✅ Verify Token", use_container_width=True):
@@ -585,15 +719,18 @@ with tab_verify:
                     st.error(f"❌ {msg}")
             else:
                 st.warning("Please enter a token code.")
+    
     with col_v2:
         if st.button("🔄 Clear Verification", use_container_width=True):
             st.session_state.token_verified = False
             st.session_state.verified_token = None
             st.rerun()
+    
     if st.session_state.token_verified and st.session_state.verified_token:
         data = st.session_state.verified_token
         st.markdown("---")
         st.markdown("### ✅ Verification Successful")
+        
         col_i1, col_i2 = st.columns(2)
         with col_i1:
             st.markdown(f"**Plan:** {data['plan_name']}")
@@ -605,9 +742,13 @@ with tab_verify:
                 st.markdown(f"**Expiry:** {data['expiry_date'][:10]}")
             else:
                 st.markdown("**Expiry:** Never")
+        
         st.markdown("""
-        <div class="info-box">✅ This token is valid. You can now access all GlobalInternet.py software suites.</div>
+        <div class="info-box">
+            ✅ This token is valid. You can now access all GlobalInternet.py software suites.
+        </div>
         """, unsafe_allow_html=True)
+        
         if st.button("🔒 Mark as Used (Testing Only)"):
             use_token(token_input, "demo_user")
             st.success("Token marked as used")
@@ -617,12 +758,14 @@ with tab_verify:
 with tab_ai:
     st.markdown("### 🤖 AI Token Analysis")
     st.markdown("Get AI-powered insights about your token inventory using Groq.")
+    
     if not GROQ_CONNECTED:
         st.info("ℹ️ Groq AI is not configured. To enable, add your `GROQ_API_KEY` to secrets. The app will then show AI insights here.")
     else:
         if st.button("📊 Analyze Token Stats", use_container_width=True):
             with st.spinner("🤖 AI is analyzing..."):
                 st.session_state.ai_response = get_ai_analysis()
+        
         token_code_for_ai = st.text_input("Or analyze a specific token:", placeholder="Enter token code", key="ai_token_input")
         if st.button("🔍 Analyze Specific Token", use_container_width=True):
             if token_code_for_ai:
@@ -630,6 +773,7 @@ with tab_ai:
                     st.session_state.ai_response = get_ai_analysis(token_code_for_ai)
             else:
                 st.warning("Please enter a token code.")
+        
         if st.session_state.ai_response:
             st.markdown("### 💡 AI Insights")
             st.markdown(f'<div class="groq-response">{st.session_state.ai_response}</div>', unsafe_allow_html=True)
@@ -638,6 +782,7 @@ with tab_ai:
 with tab_admin:
     st.markdown("### 🔐 Admin Panel")
     st.markdown("Manage tokens – requires admin password.")
+    
     if not st.session_state.admin_authenticated:
         admin_pw = st.text_input("Enter Admin Password", type="password", key="admin_pw")
         if st.button("Login", use_container_width=True):
@@ -649,6 +794,7 @@ with tab_admin:
                 st.error("❌ Wrong password")
     else:
         st.success("🔐 Admin access granted")
+        
         st.markdown("### 🆕 Generate New Tokens")
         col_gen1, col_gen2, col_gen3 = st.columns(3)
         with col_gen1:
@@ -663,6 +809,7 @@ with tab_admin:
             if st.button("💼 Pro ($29)", use_container_width=True):
                 token, _ = generate_token("Pro Monthly", 29.0, False)
                 st.success(f"Token: `{token}`")
+        
         col_gen4, col_gen5 = st.columns(2)
         with col_gen4:
             if st.button("🏢 Enterprise ($49)", use_container_width=True):
@@ -672,19 +819,27 @@ with tab_admin:
             if st.button("⭐ Lifetime ($199)", use_container_width=True):
                 token, _ = generate_token("Lifetime License", 199.0, True)
                 st.success(f"Token: `{token}` (♾️ Never expires)")
+        
         st.markdown("---")
+        
         st.markdown("### 📦 Bulk Generate 50 Initial Tokens")
         if st.button("🔄 Generate 50 Tokens", use_container_width=True):
-            plans = [("Trial Pack", 5.0, False, 10), ("Basic Monthly", 15.0, False, 15),
-                     ("Pro Monthly", 29.0, False, 10), ("Enterprise Monthly", 49.0, False, 5),
-                     ("Lifetime License", 199.0, True, 10)]
+            plans = [
+                ("Trial Pack", 5.0, False, 10),
+                ("Basic Monthly", 15.0, False, 15),
+                ("Pro Monthly", 29.0, False, 10),
+                ("Enterprise Monthly", 49.0, False, 5),
+                ("Lifetime License", 199.0, True, 10)
+            ]
             generated = []
             for plan, price, lifetime, count in plans:
                 for _ in range(count):
                     token, _ = generate_token(plan, price, lifetime)
                     generated.append(token)
             st.success(f"✅ Generated {len(generated)} tokens.")
+        
         st.markdown("---")
+        
         st.markdown("### 📋 All Tokens")
         tokens = get_all_tokens()
         if tokens:
@@ -693,11 +848,20 @@ with tab_admin:
             df['Used'] = df['Used'].apply(lambda x: '✅' if x == 1 else '')
             df['Status'] = df['Status'].apply(lambda x: {'active': '🟢 Active', 'used': '🔵 Used', 'expired': '🔴 Expired'}.get(x, x))
             st.dataframe(df, use_container_width=True, height=400)
+            
             csv = df.to_csv(index=False)
-            st.download_button("📥 Export CSV", csv, f"tokens_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv", "text/csv", use_container_width=True)
+            st.download_button(
+                "📥 Export CSV",
+                csv,
+                f"tokens_export_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+                "text/csv",
+                use_container_width=True
+            )
         else:
             st.info("No tokens yet. Generate some!")
+        
         st.markdown("---")
+        
         st.markdown("### 🗑️ Delete Token")
         del_code = st.text_input("Enter token code to delete:", key="del_token")
         if st.button("Delete Token", use_container_width=True):
@@ -710,7 +874,9 @@ with tab_admin:
                     st.error(f"❌ {msg}")
             else:
                 st.warning("Please enter a token code.")
+        
         st.markdown("---")
+        
         if st.button("🚪 Logout Admin", use_container_width=True):
             st.session_state.admin_authenticated = False
             st.rerun()
