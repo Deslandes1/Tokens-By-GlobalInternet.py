@@ -471,7 +471,7 @@ def delete_token(token_code, admin_password):
     if SUPABASE_CONNECTED and supabase:
         try:
             supabase.table('tokens').delete().eq('token_code', token_code).execute()
-            return True, "Token deleted"
+            return True, f"Token {token_code} deleted from Supabase"
         except Exception:
             pass
     init_db()
@@ -481,7 +481,7 @@ def delete_token(token_code, admin_password):
     deleted = c.rowcount > 0
     conn.commit()
     conn.close()
-    return deleted, "Token deleted" if deleted else "Token not found"
+    return deleted, f"Token {token_code} deleted from SQLite" if deleted else "Token not found"
 
 def get_ai_analysis(token_code=None):
     if not GROQ_CONNECTED or not groq_client:
@@ -579,7 +579,6 @@ with st.sidebar:
     st.markdown("### 🎤 AI Assistant")
     st.markdown("Get a voice explanation about this token business.")
     
-    # Voice button with custom styling
     voice_clicked = st.button("🎤 AI Female Voice – Explain Token Business", use_container_width=True)
     
     if voice_clicked:
@@ -862,13 +861,18 @@ with tab_admin:
         
         st.markdown("---")
         
+        # ============================================================
+        # UPDATED DELETE TOKEN SECTION (with .strip() and toast)
+        # ============================================================
         st.markdown("### 🗑️ Delete Token")
         del_code = st.text_input("Enter token code to delete:", key="del_token")
         if st.button("Delete Token", use_container_width=True):
-            if del_code:
-                ok, msg = delete_token(del_code, ADMIN_PASSWORD)
+            # Trim whitespace from the entered code
+            del_code_clean = del_code.strip() if del_code else ""
+            if del_code_clean:
+                ok, msg = delete_token(del_code_clean, ADMIN_PASSWORD)
                 if ok:
-                    st.success(f"✅ {msg}")
+                    st.toast(f"✅ Token {del_code_clean} was removed from the list", icon="🗑️")
                     st.rerun()
                 else:
                     st.error(f"❌ {msg}")
