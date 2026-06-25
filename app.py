@@ -175,6 +175,13 @@ st.markdown("""
         text-align: center !important;
         font-size: 1.1rem !important;
     }
+    .stNumberInput>div>div>input {
+        background-color: #141018 !important;
+        color: #ffffff !important;
+        border: 1px solid #2a1f14 !important;
+        border-radius: 8px !important;
+        text-align: center !important;
+    }
     .stExpander {
         border: 1px solid #2a1f14 !important;
         border-radius: 8px !important;
@@ -270,6 +277,13 @@ st.markdown("""
     .action-btn:hover {
         color: #00ff64;
         transform: scale(1.1);
+    }
+    .custom-gen-box {
+        background: rgba(0, 255, 100, 0.03);
+        border: 1px solid #2a1f14;
+        border-radius: 12px;
+        padding: 20px;
+        margin: 10px 0;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -596,6 +610,12 @@ if 'last_price' not in st.session_state:
     st.session_state.last_price = ""
 if 'last_expiry' not in st.session_state:
     st.session_state.last_expiry = ""
+if 'custom_plan' not in st.session_state:
+    st.session_state.custom_plan = ""
+if 'custom_price' not in st.session_state:
+    st.session_state.custom_price = 0.0
+if 'custom_lifetime' not in st.session_state:
+    st.session_state.custom_lifetime = False
 
 # ========== HEADER ==========
 st.markdown("""
@@ -814,7 +834,6 @@ with tab_ai:
     if not GROQ_CONNECTED:
         st.info("ℹ️ Groq AI is not configured. To enable, add your `GROQ_API_KEY` to secrets. The app will then show AI insights here.")
     else:
-        # Buttons for analysis
         col_ai1, col_ai2 = st.columns(2)
         with col_ai1:
             if st.button("📊 Analyze Token Stats", use_container_width=True):
@@ -829,19 +848,15 @@ with tab_ai:
                 else:
                     st.warning("Please enter a token code.")
         
-        # Display AI response
         if st.session_state.ai_response:
             st.markdown("### 💡 AI Insights")
             st.markdown(f'<div class="groq-response">{st.session_state.ai_response}</div>', unsafe_allow_html=True)
             
-            # ----- NEW: Listen to Analysis Button -----
             if st.button("🔊 Listen to Analysis", use_container_width=True):
                 with st.spinner("🎤 Generating audio..."):
-                    # Get the current voice language from sidebar
                     lang_code = voice_lang if 'voice_lang' in locals() else "en"
-                    # Map language codes to gTTS supported codes: 'zh' for Chinese
                     if lang_code == "zh":
-                        lang_code = "zh-CN"  # gTTS supports 'zh' as well, but let's keep it
+                        lang_code = "zh-CN"
                     audio_bytes = generate_audio(st.session_state.ai_response, lang_code)
                     if audio_bytes:
                         st.audio(audio_bytes, format="audio/mp3")
@@ -868,8 +883,84 @@ with tab_admin:
     else:
         st.success("🔐 Admin access granted")
         
-        # ---------- GENERATE NEW TOKENS (with download) ----------
-        st.markdown("### 🆕 Generate New Tokens")
+        # ============================================================
+        # NEW: CUSTOM TOKEN GENERATOR – GENERATE TOKENS WITH YOUR OWN PRICE & PLAN NAME
+        # ============================================================
+        st.markdown("### 🛠️ Custom Token Generator")
+        st.markdown("Create a token with your own plan name and price – complete flexibility.")
+        
+        with st.container(border=True):
+            col_custom1, col_custom2 = st.columns(2)
+            with col_custom1:
+                custom_plan_name = st.text_input(
+                    "Plan Name",
+                    placeholder="e.g., Premium Business, Special Offer, etc.",
+                    key="custom_plan_input",
+                    help="Enter any plan name you want"
+                )
+                custom_price = st.number_input(
+                    "Price (USD)",
+                    min_value=0.01,
+                    max_value=100000.0,
+                    value=50.0,
+                    step=5.0,
+                    key="custom_price_input",
+                    help="Set your own price"
+                )
+            with col_custom2:
+                custom_is_lifetime = st.checkbox(
+                    "♾️ Lifetime (never expires)",
+                    key="custom_lifetime_check",
+                    help="If checked, the token will never expire"
+                )
+                st.markdown("<br>", unsafe_allow_html=True)
+                if st.button("✨ Generate Custom Token", use_container_width=True, key="custom_gen_btn"):
+                    if custom_plan_name.strip():
+                        plan_name = custom_plan_name.strip()
+                        price = custom_price
+                        token, _ = generate_token(plan_name, price, custom_is_lifetime)
+                        st.session_state.last_generated = token
+                        st.session_state.last_plan = plan_name
+                        st.session_state.last_price = f"${price:.2f}"
+                        st.session_state.last_expiry = "Never" if custom_is_lifetime else (datetime.now() + timedelta(days=30)).strftime("%Y-%m-%d")
+                        st.success(f"✅ Custom token generated: {token}")
+                        st.rerun()
+                    else:
+                        st.warning("Please enter a plan name.")
+        
+        # Display last generated token with download button (for custom too)
+        if st.session_state.last_generated:
+            st.markdown("---")
+            st.markdown("### 🎯 Last Generated Token")
+            col_display, col_download = st.columns([3, 1])
+            with col_display:
+                st.code(st.session_state.last_generated, language="text")
+                st.caption(f"Plan: {st.session_state.last_plan} | Price: {st.session_state.last_price} | Expiry: {st.session_state.last_expiry}")
+            with col_download:
+                token_content = f"""
+Token Code: {st.session_state.last_generated}
+Plan: {st.session_state.last_plan}
+Price: {st.session_state.last_price}
+Expiry: {st.session_state.last_expiry}
+Purchase Date: {datetime.now().strftime('%Y-%m-%d %H:%M')}
+---
+This token grants access to GlobalInternet.py software.
+Keep this code secure and share it only with the buyer.
+"""
+                st.download_button(
+                    label="📥 Download Token",
+                    data=token_content,
+                    file_name=f"token_{st.session_state.last_generated[:8]}.txt",
+                    mime="text/plain",
+                    use_container_width=True
+                )
+        
+        st.markdown("---")
+        
+        # ---------- GENERATE PREDEFINED TOKENS ----------
+        st.markdown("### 🆕 Generate Predefined Tokens")
+        st.markdown("Quick‑generate tokens from the standard plans.")
+        
         col_gen1, col_gen2, col_gen3 = st.columns(3)
         with col_gen1:
             if st.button("📦 Trial ($5)", use_container_width=True):
@@ -914,35 +1005,9 @@ with tab_admin:
                 st.session_state.last_expiry = "Never"
                 st.rerun()
         
-        # Display last generated token with download button
-        if st.session_state.last_generated:
-            st.markdown("---")
-            st.markdown("### 🎯 Last Generated Token")
-            col_display, col_download = st.columns([3, 1])
-            with col_display:
-                st.code(st.session_state.last_generated, language="text")
-                st.caption(f"Plan: {st.session_state.last_plan} | Price: {st.session_state.last_price} | Expiry: {st.session_state.last_expiry}")
-            with col_download:
-                token_content = f"""
-Token Code: {st.session_state.last_generated}
-Plan: {st.session_state.last_plan}
-Price: {st.session_state.last_price}
-Expiry: {st.session_state.last_expiry}
-Purchase Date: {datetime.now().strftime('%Y-%m-%d %H:%M')}
----
-This token grants access to GlobalInternet.py software.
-Keep this code secure and share it only with the buyer.
-"""
-                st.download_button(
-                    label="📥 Download Token",
-                    data=token_content,
-                    file_name=f"token_{st.session_state.last_generated[:8]}.txt",
-                    mime="text/plain",
-                    use_container_width=True
-                )
-        
         st.markdown("---")
         
+        # ---------- BULK GENERATE ----------
         st.markdown("### 📦 Bulk Generate 50 Initial Tokens")
         if st.button("🔄 Generate 50 Tokens", use_container_width=True):
             plans = [
